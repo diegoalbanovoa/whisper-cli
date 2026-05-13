@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+whisper-env/
+venv/
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# Whisper output files
+transcription_*.txt
+transcription_*.json
+transcription_*.srt
+transcriptions/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+
+# Flutter — managed by whisper_ui/.gitignore

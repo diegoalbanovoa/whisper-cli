@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 
-AUDIO_EXTENSIONS = [".mp3", ".wav", ".m4a", ".flac", ".ogg"]
+AUDIO_EXTENSIONS = [".mp3", ".wav", ".m4a", ".flac", ".ogg", ".mp4"]
 
 
 def transcribe_folder(folder_path, output_folder="transcriptions", model_size="base"):

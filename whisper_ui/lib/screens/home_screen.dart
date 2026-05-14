@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
@@ -19,6 +20,7 @@ class _HomeScreenState extends State<HomeScreen>
   String? _audioFile;
   String _model = 'base';
   String _format = 'txt';
+  String? _outputDir;
   bool _isTranscribing = false;
   final List<String> _log = [];
   String? _preview;
@@ -58,6 +60,11 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
+  Future<void> _pickOutputDir() async {
+    final result = await FilePicker.platform.getDirectoryPath();
+    if (result != null) setState(() => _outputDir = result);
+  }
+
   Future<void> _pickFolder() async {
     final result = await FilePicker.platform.getDirectoryPath();
     if (result != null) {
@@ -78,10 +85,13 @@ class _HomeScreenState extends State<HomeScreen>
     });
 
     try {
+      final effectiveOutputDir =
+          _outputDir ?? File(_audioFile!).parent.path;
       await for (final line in _service.transcribeSingle(
         audioPath: _audioFile!,
         model: _model,
         format: _format,
+        outputDir: effectiveOutputDir,
       )) {
         setState(() {
           _log.add(line);
@@ -191,7 +201,17 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          _OutputDirRow(
+            selectedDir: _outputDir,
+            defaultLabel: _audioFile != null
+                ? 'Junto al archivo de audio'
+                : 'Junto al archivo de audio',
+            enabled: !_isTranscribing,
+            onPick: _pickOutputDir,
+            onClear: () => setState(() => _outputDir = null),
+          ),
+          const SizedBox(height: 20),
           FilledButton.icon(
             onPressed:
                 (_audioFile != null && !_isTranscribing) ? _transcribe : null,
@@ -290,28 +310,53 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     // In progress: show live log
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: ListView.builder(
-        itemCount: _log.length,
-        itemBuilder: (_, i) => Padding(
-          padding: const EdgeInsets.only(bottom: 4),
-          child: Text(
-            _log[i],
-            style: TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 13,
-              color: _log[i].startsWith('Error')
-                  ? colors.error
-                  : colors.onSurface,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton.icon(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: _log.join('\n')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Logs copiados al portapapeles')),
+                );
+              },
+              icon: const Icon(Icons.copy_rounded, size: 16),
+              label: const Text('Copiar logs'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Expanded(
+          child: SelectionArea(
+            child: Container(
+              decoration: BoxDecoration(
+                color: colors.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.all(16),
+              child: ListView.builder(
+                itemCount: _log.length,
+                itemBuilder: (_, i) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    _log[i],
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 13,
+                      color: _log[i].startsWith('Error')
+                          ? colors.error
+                          : colors.onSurface,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -372,34 +417,59 @@ class _HomeScreenState extends State<HomeScreen>
                       ],
                     ),
                   )
-                : Container(
-                    decoration: BoxDecoration(
-                      color: colors.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    child: ListView.builder(
-                      itemCount: _batchLog.length,
-                      itemBuilder: (_, i) {
-                        final line = _batchLog[i];
-                        Color? lineColor;
-                        if (line.contains('✓')) lineColor = colors.primary;
-                        if (line.contains('✗') || line.startsWith('Error')) {
-                          lineColor = colors.error;
-                        }
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Text(
-                            line,
-                            style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 13,
-                              color: lineColor ?? colors.onSurface,
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton.icon(
+                            onPressed: () {
+                              Clipboard.setData(ClipboardData(text: _batchLog.join('\n')));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Logs copiados al portapapeles')),
+                              );
+                            },
+                            icon: const Icon(Icons.copy_rounded, size: 16),
+                            label: const Text('Copiar logs'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Expanded(
+                        child: SelectionArea(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: colors.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.all(16),
+                            child: ListView.builder(
+                              itemCount: _batchLog.length,
+                              itemBuilder: (_, i) {
+                                final line = _batchLog[i];
+                                Color? lineColor;
+                                if (line.contains('✓')) lineColor = colors.primary;
+                                if (line.contains('✗') || line.startsWith('Error')) {
+                                  lineColor = colors.error;
+                                }
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Text(
+                                    line,
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 13,
+                                      color: lineColor ?? colors.onSurface,
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                      ),
+                    ],
                   ),
           ),
         ],
@@ -479,6 +549,76 @@ class _FileCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _OutputDirRow extends StatelessWidget {
+  final String? selectedDir;
+  final String defaultLabel;
+  final bool enabled;
+  final VoidCallback onPick;
+  final VoidCallback onClear;
+
+  const _OutputDirRow({
+    required this.selectedDir,
+    required this.defaultLabel,
+    required this.enabled,
+    required this.onPick,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final hasDir = selectedDir != null;
+    return Row(
+      children: [
+        Icon(
+          Icons.drive_folder_upload_rounded,
+          size: 20,
+          color: hasDir ? colors.primary : colors.onSurfaceVariant,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Carpeta de destino',
+                style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant),
+              ),
+              Text(
+                hasDir ? selectedDir! : defaultLabel,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: hasDir ? colors.onSurface : colors.onSurfaceVariant,
+                  fontStyle: hasDir ? FontStyle.normal : FontStyle.italic,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ],
+          ),
+        ),
+        if (hasDir)
+          IconButton(
+            icon: Icon(Icons.close_rounded, size: 18, color: colors.onSurfaceVariant),
+            tooltip: 'Restaurar carpeta por defecto',
+            onPressed: enabled ? onClear : null,
+            padding: const EdgeInsets.all(4),
+            constraints: const BoxConstraints(),
+          ),
+        const SizedBox(width: 4),
+        OutlinedButton(
+          onPressed: enabled ? onPick : null,
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            textStyle: const TextStyle(fontSize: 13),
+          ),
+          child: Text(hasDir ? 'Cambiar' : 'Escoger'),
+        ),
+      ],
     );
   }
 }
